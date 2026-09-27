@@ -41,7 +41,7 @@ export const alertsApi = {
   },
 
   triggerAi: async (id: string, force = false): Promise<AIAnalysis> => {
-    return apiRequest<AIAnalysis>(`/api/v1/alerts/${id}/ai-analyses?force=${force}`, {
+    return apiRequest<AIAnalysis>(`/api/v1/alerts/${id}/ai-analysis?force=${force}`, {
       method: 'POST',
     });
   },

@@ -26,8 +26,9 @@ async def list_elderly(
     session: Annotated[AsyncSession, Depends(get_db)],
     current_user: Annotated[AuthenticatedUser, Depends(get_current_user)],
     skip: int = Query(0, ge=0),
-    limit: int = Query(50, ge=1, le=100),
+    limit: int = Query(100, ge=1, le=1000),
     active_only: bool = True,
+    search: str | None = Query(default=None, description="Search by name or phone"),
 ) -> list[ElderlyPerson]:
     """List elderly residents.
 
@@ -36,6 +37,14 @@ async def list_elderly(
     stmt = select(ElderlyPerson)
     if active_only:
         stmt = stmt.where(ElderlyPerson.is_active.is_(True))
+
+    if search:
+        pattern = f"%{search}%"
+        stmt = stmt.where(
+            (ElderlyPerson.first_name.ilike(pattern))
+            | (ElderlyPerson.last_name.ilike(pattern))
+            | (ElderlyPerson.phone.ilike(pattern))
+        )
 
     # Caregiver tenant isolation
     if current_user.role == "CAREGIVER" and current_user.assigned_elderly_ids:

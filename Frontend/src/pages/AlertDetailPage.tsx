@@ -7,6 +7,8 @@ import {
   Smartphone,
   CheckCircle,
   Layers,
+  Sparkles,
+  MessageSquare,
 } from 'lucide-react';
 import { alertsApi } from '../api/alerts';
 import { Alert } from '../types';
@@ -83,6 +85,20 @@ export const AlertDetailPage: React.FC = () => {
     }
   };
 
+  const handleOpenAIChat = () => {
+    if (!alert) return;
+    window.dispatchEvent(
+      new CustomEvent('open-ai-chat', {
+        detail: {
+          elderly_id: alert.elderly_id,
+          alert_id: alert.id,
+          context_label: `${alert.title} (${alert.elderly_name || 'Résident'})`,
+          initial_prompt: `Peux-tu m'expliquer en détail les anomalies physiques et cinématiques de cette alerte (${alert.title}) et les vérifications recommandées ?`,
+        },
+      })
+    );
+  };
+
   if (isLoading) {
     return <Spinner size="lg" className="py-20" />;
   }
@@ -126,25 +142,32 @@ export const AlertDetailPage: React.FC = () => {
           </div>
 
           {/* Action buttons */}
-          {canMutate && (
-            <div className="flex items-center gap-2 shrink-0">
-              {alert.status === 'OPEN' && (
-                <Button variant="secondary" onClick={handleAck} isLoading={actionLoading}>
-                  Acquitter l'alerte
-                </Button>
-              )}
-              {alert.status !== 'RESOLVED' && (
-                <Button
-                  variant="success"
-                  icon={<CheckCircle className="w-4 h-4" />}
-                  onClick={handleResolve}
-                  isLoading={actionLoading}
-                >
-                  Marquer comme Résolue
-                </Button>
-              )}
-            </div>
-          )}
+          <div className="flex flex-wrap items-center gap-2 shrink-0">
+            <Button
+              variant="secondary"
+              icon={<Sparkles className="w-4 h-4 text-indigo-400" />}
+              onClick={handleOpenAIChat}
+              className="border-indigo-500/40 text-indigo-300 hover:bg-indigo-950/40"
+            >
+              Interroger l'IA (Chat)
+            </Button>
+
+            {canMutate && alert.status === 'OPEN' && (
+              <Button variant="secondary" onClick={handleAck} isLoading={actionLoading}>
+                Acquitter l'alerte
+              </Button>
+            )}
+            {canMutate && alert.status !== 'RESOLVED' && (
+              <Button
+                variant="success"
+                icon={<CheckCircle className="w-4 h-4" />}
+                onClick={handleResolve}
+                isLoading={actionLoading}
+              >
+                Marquer comme Résolue
+              </Button>
+            )}
+          </div>
         </div>
       </div>
 

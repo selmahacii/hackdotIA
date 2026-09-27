@@ -107,6 +107,62 @@ class GroqClient(BaseAIClient):
             model_name=self.model,
         )
 
+    async def chat(
+        self,
+        messages: list[dict[str, str]],
+        temperature: float | None = None,
+        max_tokens: int | None = None,
+    ) -> tuple[str, int, str]:
+        """Execute a conversational completion call to Groq Cloud."""
+        if not self.api_key:
+            raise AIClientError("GROQ_API_KEY is not configured")
+
+        url = f"{self.base_url}/chat/completions"
+        headers = {
+            "Authorization": f"Bearer {self.api_key}",
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+        }
+        payload = {
+            "model": self.model,
+            "messages": messages,
+            "temperature": temperature if temperature is not None else self.temperature,
+            "max_tokens": max_tokens if max_tokens is not None else 1024,
+            "stream": False,
+        }
+
+        start_time = time.perf_counter()
+        try:
+            async with httpx.AsyncClient(timeout=self.timeout) as client:
+                response = await client.post(url, headers=headers, json=payload)
+                response.raise_for_status()
+                raw_json = response.json()
+        except httpx.TimeoutException as exc:
+            elapsed_ms = int((time.perf_counter() - start_time) * 1000)
+            logger.warning("Groq API chat request timed out after %d ms", elapsed_ms)
+            raise AIClientTimeoutError(f"Groq API timed out after {self.timeout}s") from exc
+        except httpx.HTTPStatusError as exc:
+            elapsed_ms = int((time.perf_counter() - start_time) * 1000)
+            logger.error(
+                "Groq API chat returned HTTP error %d: %s", exc.response.status_code, exc.response.text
+            )
+            raise AIClientError(f"Groq API error HTTP {exc.response.status_code}") from exc
+        except Exception as exc:
+            elapsed_ms = int((time.perf_counter() - start_time) * 1000)
+            logger.error("Unexpected error contacting Groq API chat: %s", exc)
+            raise AIClientError(f"Groq API network/client error: {exc}") from exc
+
+        elapsed_ms = int((time.perf_counter() - start_time) * 1000)
+        try:
+            choices = raw_json.get("choices", [])
+            if not choices:
+                raise AIClientParseError("Groq API returned empty choices")
+            content = choices[0].get("message", {}).get("content", "")
+        except (AttributeError, KeyError, IndexError) as exc:
+            raise AIClientParseError(f"Malformed Groq API response: {exc}") from exc
+
+        return content, elapsed_ms, self.model
+
 
 class FakeGroqClient(BaseAIClient):
     """Mock client for testing without external Groq network dependencies."""
@@ -167,3 +223,18 @@ class FakeGroqClient(BaseAIClient):
             latency_ms=self.latency_ms,
             model_name=self.model_name,
         )
+
+    async def chat(
+        self,
+        messages: list[dict[str, str]],
+        temperature: float | None = None,
+        max_tokens: int | None = None,
+    ) -> tuple[str, int, str]:
+        self.call_count += 1
+        return (
+            "D'après les relevés des capteurs (MAX30102 et MPU6050), les constantes vitales montrent une stabilité globale. "
+            "Les alertes récentes correspondent à des variations physiologiques ou cinématiques nécessitant une simple vérification de confort par l'équipe soignante.",
+            self.latency_ms,
+            self.model_name,
+        )
+

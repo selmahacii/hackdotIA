@@ -2,6 +2,7 @@ import React from 'react';
 import { Outlet } from 'react-router-dom';
 import { Navbar } from './Navbar';
 import { Sidebar } from './Sidebar';
+import { AIChatbotDrawer } from '../AI/AIChatbotDrawer';
 
 export const Layout: React.FC = () => {
   return (
@@ -13,6 +14,7 @@ export const Layout: React.FC = () => {
           <Outlet />
         </main>
       </div>
+      <AIChatbotDrawer />
     </div>
   );
 };

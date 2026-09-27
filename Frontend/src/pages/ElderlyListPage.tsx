@@ -28,10 +28,10 @@ export const ElderlyListPage: React.FC = () => {
     date_of_birth: '',
   });
 
-  const loadResidents = async () => {
+  const loadResidents = async (query?: string) => {
     setIsLoading(true);
     try {
-      const data = await elderlyApi.list();
+      const data = await elderlyApi.list(true, 0, 100, query);
       setResidents(data);
     } catch (err: any) {
       setErrorMsg(err.message || 'Erreur lors du chargement des résidents');
@@ -41,8 +41,11 @@ export const ElderlyListPage: React.FC = () => {
   };
 
   useEffect(() => {
-    loadResidents();
-  }, []);
+    const timer = setTimeout(() => {
+      loadResidents(searchTerm.trim() || undefined);
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
 
   const handleCreateResident = async (e: React.FormEvent) => {
     e.preventDefault();

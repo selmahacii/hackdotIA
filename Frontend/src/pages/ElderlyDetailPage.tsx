@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { ArrowLeft, Phone, Calendar, Activity } from 'lucide-react';
+import { ArrowLeft, Phone, Calendar, Activity, Sparkles } from 'lucide-react';
 import { elderlyApi } from '../api/elderly';
 import { devicesApi } from '../api/devices';
 import { measurementsApi } from '../api/measurements';
@@ -8,6 +8,7 @@ import { alertsApi } from '../api/alerts';
 import { ElderlyPerson, Device, MeasurementHistoryPoint, Alert } from '../types';
 import { Card } from '../components/Common/Card';
 import { Badge } from '../components/Common/Badge';
+import { Button } from '../components/Common/Button';
 import { Spinner } from '../components/Common/Spinner';
 import { VitalTrendChart } from '../components/Charts/VitalTrendChart';
 
@@ -53,6 +54,19 @@ export const ElderlyDetailPage: React.FC = () => {
     loadData();
   }, [id]);
 
+  const handleOpenAIChat = () => {
+    if (!resident) return;
+    window.dispatchEvent(
+      new CustomEvent('open-ai-chat', {
+        detail: {
+          elderly_id: resident.id,
+          context_label: `${resident.first_name} ${resident.last_name}`,
+          initial_prompt: `Peux-tu m'analyser en détail les constantes vitales et signaux récents de ${resident.first_name} ${resident.last_name} et me donner ton avis opérationnel ?`,
+        },
+      })
+    );
+  };
+
   if (isLoading) {
     return <Spinner size="lg" className="py-20" />;
   }
@@ -96,7 +110,17 @@ export const ElderlyDetailPage: React.FC = () => {
             </div>
           </div>
 
-          <Badge label={resident.is_active ? 'SUIVI ACTIF' : 'INACTIF'} variant="sensor" />
+          <div className="flex items-center gap-3">
+            <Button
+              variant="secondary"
+              icon={<Sparkles className="w-4 h-4 text-indigo-400" />}
+              onClick={handleOpenAIChat}
+              className="border-indigo-500/40 text-indigo-300 hover:bg-indigo-950/40"
+            >
+              Assistance IA Télémétrie
+            </Button>
+            <Badge label={resident.is_active ? 'SUIVI ACTIF' : 'INACTIF'} variant="sensor" />
+          </div>
         </div>
       </div>
 

@@ -76,6 +76,16 @@ class BaseAIClient(ABC):
         """Execute prompt against AI provider and return structured AIResponse."""
         pass
 
+    @abstractmethod
+    async def chat(
+        self,
+        messages: list[dict[str, str]],
+        temperature: float | None = None,
+        max_tokens: int | None = None,
+    ) -> tuple[str, int, str]:
+        """Execute conversational chat and return (reply_text, latency_ms, model_name)."""
+        pass
+
 
 class NVIDIAClient(BaseAIClient):
     """Production client for NVIDIA Cloud Functions / OpenAI-compatible API."""
@@ -165,6 +175,50 @@ class NVIDIAClient(BaseAIClient):
             model_name=self.model,
         )
 
+    async def chat(
+        self,
+        messages: list[dict[str, str]],
+        temperature: float | None = None,
+        max_tokens: int | None = None,
+    ) -> tuple[str, int, str]:
+        if not self.api_key:
+            raise AIClientError("NVIDIA_API_KEY is not configured")
+
+        url = f"{self.base_url}/chat/completions"
+        headers = {
+            "Authorization": f"Bearer {self.api_key}",
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+        }
+        payload = {
+            "model": self.model,
+            "messages": messages,
+            "temperature": temperature if temperature is not None else self.temperature,
+            "max_tokens": max_tokens if max_tokens is not None else self.max_tokens,
+            "stream": False,
+        }
+
+        start_time = time.perf_counter()
+        try:
+            async with httpx.AsyncClient(timeout=self.timeout) as client:
+                response = await client.post(url, headers=headers, json=payload)
+                response.raise_for_status()
+                raw_json = response.json()
+        except httpx.TimeoutException as exc:
+            elapsed_ms = int((time.perf_counter() - start_time) * 1000)
+            raise AIClientTimeoutError(f"NVIDIA API timed out after {self.timeout}s") from exc
+        except Exception as exc:
+            raise AIClientError(f"NVIDIA API chat error: {exc}") from exc
+
+        elapsed_ms = int((time.perf_counter() - start_time) * 1000)
+        try:
+            choices = raw_json.get("choices", [])
+            content = choices[0].get("message", {}).get("content", "") if choices else ""
+        except Exception as exc:
+            raise AIClientParseError(f"Malformed response: {exc}") from exc
+
+        return content, elapsed_ms, self.model
+
 
 class FakeNVIDIAClient(BaseAIClient):
     """Mock client for testing without external NVIDIA network dependencies."""
@@ -225,3 +279,17 @@ class FakeNVIDIAClient(BaseAIClient):
             latency_ms=self.latency_ms,
             model_name=self.model_name,
         )
+
+    async def chat(
+        self,
+        messages: list[dict[str, str]],
+        temperature: float | None = None,
+        max_tokens: int | None = None,
+    ) -> tuple[str, int, str]:
+        self.call_count += 1
+        return (
+            "D'après les relevés des capteurs, la situation est sous contrôle. Les paramètres vitaux sont stables.",
+            self.latency_ms,
+            self.model_name,
+        )
+

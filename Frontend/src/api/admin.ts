@@ -46,4 +46,8 @@ export const adminApi = {
   getStats: async (): Promise<AdminStats> => {
     return apiRequest<AdminStats>('/api/v1/admin/stats');
   },
+
+  getRbacMatrix: async (): Promise<import('../types').RbacMatrixResponse> => {
+    return apiRequest<import('../types').RbacMatrixResponse>('/api/v1/admin/rbac/matrix');
+  },
 };

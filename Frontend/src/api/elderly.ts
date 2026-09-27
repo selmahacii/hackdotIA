@@ -2,10 +2,14 @@ import { apiRequest } from './client';
 import { ElderlyPerson } from '../types';
 
 export const elderlyApi = {
-  list: async (activeOnly = true, skip = 0, limit = 50): Promise<ElderlyPerson[]> => {
-    return apiRequest<ElderlyPerson[]>(
-      `/api/v1/elderly?active_only=${activeOnly}&skip=${skip}&limit=${limit}`
-    );
+  list: async (activeOnly = true, skip = 0, limit = 100, search?: string): Promise<ElderlyPerson[]> => {
+    const params = new URLSearchParams({
+      active_only: String(activeOnly),
+      skip: String(skip),
+      limit: String(limit),
+    });
+    if (search) params.append('search', search);
+    return apiRequest<ElderlyPerson[]>(`/api/v1/elderly?${params.toString()}`);
   },
 
   getById: async (id: string): Promise<ElderlyPerson> => {

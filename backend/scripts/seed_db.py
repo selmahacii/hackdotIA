@@ -156,6 +156,14 @@ async def seed() -> None:
         await session.commit()
         logger.info("Database seeding completed successfully.")
 
+    # Seed production telemetry, alerts, and user account for Imad Ghobrini
+    try:
+        from app.db.seed_imad import seed_imad_data
+        await seed_imad_data()
+    except Exception as exc:
+        logger.warning("Could not run seed_imad_data: %s", exc)
+
 
 if __name__ == "__main__":
     asyncio.run(seed())
+

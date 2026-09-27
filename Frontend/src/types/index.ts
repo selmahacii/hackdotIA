@@ -212,3 +212,61 @@ export interface AdminStats {
   };
   system_status: string;
 }
+
+export interface RbacRoleMetadata {
+  role: UserRole;
+  name: string;
+  level: number;
+  badge_variant: string;
+  description: string;
+  target_persona: string;
+  caregiver_isolation: boolean;
+  can_delete_users: boolean;
+  can_manage_admins: boolean;
+}
+
+export interface RbacPermission {
+  code: string;
+  label: string;
+  description: string;
+  roles: UserRole[];
+}
+
+export interface RbacModule {
+  category: string;
+  permissions: RbacPermission[];
+}
+
+export interface RbacPolicies {
+  caregiver_isolation_mode: string;
+  caregiver_scope_rule: string;
+  token_algorithm: string;
+  token_ttl_minutes: number;
+  least_privilege_enforced: boolean;
+}
+
+export interface RbacMatrixResponse {
+  roles: RbacRoleMetadata[];
+  modules: RbacModule[];
+  policies: RbacPolicies;
+}
+
+export interface AIChatMessage {
+  role: 'user' | 'assistant' | 'system';
+  content: string;
+}
+
+export interface AIChatRequest {
+  message: string;
+  elderly_id?: string | null;
+  alert_id?: string | null;
+  history?: AIChatMessage[];
+}
+
+export interface AIChatResponse {
+  reply: string;
+  context_used: Record<string, any>;
+  model_name: string | null;
+  latency_ms: number | null;
+}
+

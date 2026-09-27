@@ -102,3 +102,23 @@ class AIAnalysisAdminResponse(AIAnalysisResponse):
     """Privileged admin response that includes sanitized raw_response."""
 
     raw_response: dict[str, Any] | None = None
+
+
+class AIChatMessage(BaseModel):
+    role: str = Field(..., description="Role of the sender: 'user', 'assistant', or 'system'")
+    content: str = Field(..., min_length=1, max_length=4000)
+
+
+class AIChatRequest(BaseModel):
+    message: str = Field(..., min_length=1, max_length=2000, description="User prompt or clinical question")
+    elderly_id: uuid.UUID | None = Field(default=None, description="Optional resident ID for context")
+    alert_id: uuid.UUID | None = Field(default=None, description="Optional alert ID to explain in detail")
+    history: list[AIChatMessage] = Field(default_factory=list, description="Recent conversation turns")
+
+
+class AIChatResponse(BaseModel):
+    reply: str = Field(..., description="Conversational explanation or clinical assistant answer")
+    context_used: dict[str, Any] = Field(default_factory=dict, description="Summary of real database context injected")
+    model_name: str | None = None
+    latency_ms: int | None = None
+

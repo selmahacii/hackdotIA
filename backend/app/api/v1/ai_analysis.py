@@ -15,7 +15,7 @@ from app.api.deps import (
 )
 from app.repositories.ai_analysis import AIAnalysisRepository
 from app.repositories.alert import AlertRepository
-from app.schemas.ai_analysis import AIAnalysisResponse
+from app.schemas.ai_analysis import AIAnalysisResponse, AIChatRequest, AIChatResponse
 from app.services.ai_analysis import AIAnalysisService
 from app.websocket.manager import ws_manager
 
@@ -66,6 +66,12 @@ async def get_alert_ai_analysis(
     summary="Trigger or re-trigger AI analysis for an alert",
     description="Triggers AI enrichment analysis. Requires role ADMIN, CAREGIVER, or OPERATOR.",
 )
+@router.post(
+    "/alerts/{alert_id}/ai-analyses",
+    response_model=AIAnalysisResponse,
+    status_code=status.HTTP_200_OK,
+    include_in_schema=False,
+)
 async def trigger_alert_ai_analysis(
     alert_id: uuid.UUID,
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -90,6 +96,36 @@ async def trigger_alert_ai_analysis(
     service = AIAnalysisService(db)
     analysis = await service.run_enrichment_for_alert(alert_id, force=force)
     return AIAnalysisResponse.model_validate(analysis)
+
+
+@router.post(
+    "/ai/chat",
+    response_model=AIChatResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Interactive AI Clinical Assistant Chat",
+    description="Ask questions about resident vitals, kinematic events, MPU6050 spikes, or general telemetry. Requires authenticated role.",
+)
+@router.post(
+    "/ai-analysis/chat",
+    response_model=AIChatResponse,
+    status_code=status.HTTP_200_OK,
+    include_in_schema=False,
+)
+async def chat_with_clinical_assistant_endpoint(
+    req: AIChatRequest,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[
+        AuthenticatedUser,
+        Depends(require_roles(["ADMIN", "SUPERADMIN", "CAREGIVER", "OPERATOR", "READ_ONLY"])),
+    ],
+) -> AIChatResponse:
+    service = AIAnalysisService(db)
+    return await service.chat_with_clinical_assistant(
+        message=req.message,
+        elderly_id=req.elderly_id,
+        alert_id=req.alert_id,
+        history=req.history,
+    )
 
 
 @router.websocket("/alerts/ws")

@@ -42,3 +42,7 @@ dist-ssr/
 # Firmware build artifacts
 firmware/build/
 firmware/managed_components/
+
+# Hugging Face deployment repo
+guardia/
+
