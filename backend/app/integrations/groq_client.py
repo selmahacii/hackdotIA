@@ -71,7 +71,9 @@ class GroqClient(BaseAIClient):
             raise AIClientTimeoutError(f"Groq API timed out after {self.timeout}s") from exc
         except httpx.HTTPStatusError as exc:
             elapsed_ms = int((time.perf_counter() - start_time) * 1000)
-            logger.error("Groq API returned HTTP error %d: %s", exc.response.status_code, exc.response.text)
+            logger.error(
+                "Groq API returned HTTP error %d: %s", exc.response.status_code, exc.response.text
+            )
             raise AIClientError(f"Groq API error HTTP {exc.response.status_code}") from exc
         except Exception as exc:
             elapsed_ms = int((time.perf_counter() - start_time) * 1000)
@@ -121,13 +123,18 @@ class FakeGroqClient(BaseAIClient):
     ) -> None:
         self.canned_result = canned_result or AIEnrichmentResult(
             summary="Kinematic anomaly detected: sudden deceleration spike followed by stationary state.",
-            observations=["Accelerometer magnitude peaked at 3.42g", "Stationary state observed for >3s"],
+            observations=[
+                "Accelerometer magnitude peaked at 3.42g",
+                "Stationary state observed for >3s",
+            ],
             context="Compatible with postural impact sequence requiring caregiver confirmation",
             confidence=0.89,
             data_quality="OPTIMAL",
             possible_factors=["Rapid posture transition", "Impact pattern"],
             recommended_checks=["Verify resident mobility and consciousness", "Inspect room floor"],
-            limitations=["Kinematic inference without direct visual telemetry; human verification required"],
+            limitations=[
+                "Kinematic inference without direct visual telemetry; human verification required"
+            ],
         )
         self.simulate_timeout = simulate_timeout
         self.simulate_http_status = simulate_http_status

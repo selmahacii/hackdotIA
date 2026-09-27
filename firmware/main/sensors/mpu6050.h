@@ -24,6 +24,7 @@ typedef struct {
  * @param i2c_mutex FreeRTOS mutex protecting shared I2C bus transactions
  */
 esp_err_t mpu6050_init(i2c_master_bus_handle_t bus_handle, SemaphoreHandle_t i2c_mutex);
+esp_err_t mpu6050_init_with_addr(i2c_master_bus_handle_t bus_handle, SemaphoreHandle_t i2c_mutex, uint8_t dev_addr);
 
 /**
  * Reads 3-axis acceleration and computes vector magnitude in g.

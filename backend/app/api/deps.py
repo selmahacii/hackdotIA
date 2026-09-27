@@ -77,7 +77,7 @@ def require_roles(
     async def role_checker(
         current_user: Annotated[AuthenticatedUser, Depends(get_current_user)],
     ) -> AuthenticatedUser:
-        if current_user.role not in allowed_upper:
+        if current_user.role != "SUPERADMIN" and current_user.role not in allowed_upper:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail=f"Operation not permitted for role '{current_user.role}'. Required: {sorted(allowed_upper)}",
@@ -97,6 +97,16 @@ def check_alert_caregiver_access(alert: Alert, user: AuthenticatedUser) -> None:
             )
 
 
+def check_elderly_caregiver_access(elderly_id: uuid.UUID, user: AuthenticatedUser) -> None:
+    """Check caregiver isolation on resident endpoint."""
+    if user.role == "CAREGIVER" and user.assigned_elderly_ids:
+        if elderly_id not in user.assigned_elderly_ids:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Caregiver is not authorized to access this resident",
+            )
+
+
 __all__ = [
     "get_db",
     "AsyncGenerator",
@@ -105,4 +115,5 @@ __all__ = [
     "get_current_user",
     "require_roles",
     "check_alert_caregiver_access",
+    "check_elderly_caregiver_access",
 ]

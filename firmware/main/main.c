@@ -48,7 +48,9 @@ static void init_actuators(void)
     };
     gpio_config(&io_conf);
 
-#ifndef CONFIG_DIAGNOSTIC_BOOT_SILENT
+#if defined(BUZZER_BOOT_BEEP) && (BUZZER_BOOT_BEEP == 0)
+    ESP_LOGI("BOOT", "Buzzer boot beep disabled (diagnostic mode BUZZER_BOOT_BEEP=0)");
+#elif !defined(CONFIG_DIAGNOSTIC_BOOT_SILENT)
     /* Single short confirmation beep on boot (50ms) */
     gpio_set_level(PIN_BUZZER, 1);
     vTaskDelay(pdMS_TO_TICKS(50));
@@ -162,7 +164,7 @@ static void status_led_task(void *pvParameters)
  * Takes coherent atomic snapshot, constructs JSON matching backend contract exactly,
  * manages NTP clock validity, and guarantees idempotent retries upon MQTT publish failure.
  */
-static void telemetry_publisher_task(void *pvParameters)
+static void __attribute__((unused)) telemetry_publisher_task(void *pvParameters)
 {
     ESP_LOGI(TAG, "Telemetry publisher task started (1 Hz)");
     TickType_t xLastWakeTime = xTaskGetTickCount();
@@ -259,6 +261,8 @@ void app_main(void)
              (rst_reason == ESP_RST_POWERON) ? "ESP_RST_POWERON: Normal power on" :
              (rst_reason == ESP_RST_SW) ? "ESP_RST_SW: Software reset" : "OTHER");
     ESP_LOGI("BOOT", "Device UID: %s | Target: ESP32", CONFIG_DEVICE_UID);
+    printf("POWER_DIAG: boot stable (reset reason: %d)\r\n", (int)rst_reason);
+    ESP_LOGI("POWER_DIAG", "boot stable");
 
     /* 1. Initialize NVS Flash */
     esp_err_t ret = nvs_flash_init();
@@ -275,6 +279,32 @@ void app_main(void)
     s_i2c_bus_mutex = xSemaphoreCreateMutex();
     s_sensor_snapshot_mutex = xSemaphoreCreateMutex();
 
+    /* =========================================================================
+     * STEP 5: Check Electrical State of I2C Bus (SDA / SCL Idle Level)
+     * ========================================================================= */
+    gpio_config_t i2c_pin_check = {
+        .pin_bit_mask = (1ULL << PIN_I2C_SDA) | (1ULL << PIN_I2C_SCL),
+        .mode = GPIO_MODE_INPUT,
+        .pull_up_en = GPIO_PULLUP_ENABLE,
+        .pull_down_en = GPIO_PULLDOWN_DISABLE,
+        .intr_type = GPIO_INTR_DISABLE,
+    };
+    gpio_config(&i2c_pin_check);
+    vTaskDelay(pdMS_TO_TICKS(10));
+
+    int sda_idle = gpio_get_level(PIN_I2C_SDA);
+    int scl_idle = gpio_get_level(PIN_I2C_SCL);
+
+    printf("I2C_DIAG: SDA idle = %s\r\n", sda_idle ? "HIGH" : "LOW");
+    printf("I2C_DIAG: SCL idle = %s\r\n", scl_idle ? "HIGH" : "LOW");
+    ESP_LOGI("I2C_DIAG", "SDA idle = %s", sda_idle ? "HIGH" : "LOW");
+    ESP_LOGI("I2C_DIAG", "SCL idle = %s", scl_idle ? "HIGH" : "LOW");
+
+    if (!sda_idle || !scl_idle) {
+        printf("I2C_DIAG: WARNING — I2C line stuck LOW\r\n");
+        ESP_LOGW("I2C_DIAG", "WARNING — I2C line stuck LOW");
+    }
+
     /* 4. Initialize I2C Master Bus (driver/i2c_master.h) */
     i2c_master_bus_config_t i2c_bus_config = {
         .clk_source = I2C_CLK_SRC_DEFAULT,
@@ -288,69 +318,123 @@ void app_main(void)
     ESP_ERROR_CHECK(i2c_new_master_bus(&i2c_bus_config, &bus_handle));
 
     /* =========================================================================
-     * I2C DIAGNOSTIC: Check line levels & perform bus scan
+     * STEP 3: I2C Scanner (0x01 -> 0x7F)
      * ========================================================================= */
-    int sda_lvl = gpio_get_level(PIN_I2C_SDA);
-    int scl_lvl = gpio_get_level(PIN_I2C_SCL);
-    ESP_LOGI("I2C_DIAG", "SDA=%d SCL=%d", sda_lvl, scl_lvl);
+    printf("I2C_DIAG: starting scan\r\n");
+    printf("I2C_DIAG: SDA=%d SCL=%d\r\n", PIN_I2C_SDA, PIN_I2C_SCL);
+    printf("I2C_DIAG: scanning 0x01-0x7F\r\n");
+    ESP_LOGI("I2C_DIAG", "starting scan");
+    ESP_LOGI("I2C_DIAG", "SDA=%d SCL=%d", PIN_I2C_SDA, PIN_I2C_SCL);
+    ESP_LOGI("I2C_DIAG", "scanning 0x01-0x7F");
 
-    ESP_LOGI("I2C_DIAG", "Starting I2C scan...");
     int devices_found = 0;
-    for (uint16_t addr = 0x01; addr < 0x80; addr++) {
+    for (uint16_t addr = 0x01; addr <= 0x7F; addr++) {
         esp_err_t probe_res = i2c_master_probe(bus_handle, addr, 20);
         if (probe_res == ESP_OK) {
-            ESP_LOGI("I2C_DIAG", "Device ACK at 0x%02X", addr);
+            printf("I2C_DIAG: device ACK at 0x%02X\r\n", addr);
+            ESP_LOGI("I2C_DIAG", "device ACK at 0x%02X", addr);
             devices_found++;
         }
     }
+    printf("I2C_DIAG: scan complete\r\n");
+    ESP_LOGI("I2C_DIAG", "scan complete");
     if (devices_found > 0) {
-        ESP_LOGI("I2C_DIAG", "Scan complete, %d device(s) found", devices_found);
+        printf("I2C_DIAG: found %d device(s)\r\n", devices_found);
+        ESP_LOGI("I2C_DIAG", "found %d device(s)", devices_found);
     } else {
-        ESP_LOGI("I2C_DIAG", "Scan complete, NO devices found");
+        printf("I2C_DIAG: NO DEVICE ACK\r\n");
+        ESP_LOGI("I2C_DIAG", "NO DEVICE ACK");
     }
 
     /* =========================================================================
-     * 5. SENSOR INIT: Check return codes and log explicitly
+     * STEP 4: Explicit Address Test (0x57, 0x68, 0x69)
      * ========================================================================= */
-    ESP_LOGI("SENSOR_INIT", "=== INITIALIZING HARDWARE SENSORS ===");
-    esp_err_t mpu_ret = mpu6050_init(bus_handle, s_i2c_bus_mutex);
+    esp_err_t p57 = i2c_master_probe(bus_handle, 0x57, 50);
+    esp_err_t p68 = i2c_master_probe(bus_handle, 0x68, 50);
+    esp_err_t p69 = i2c_master_probe(bus_handle, 0x69, 50);
+
+    printf("I2C_DIAG: MAX30102 0x57 = %s\r\n", (p57 == ESP_OK) ? "ACK" : "NO_ACK");
+    printf("I2C_DIAG: MPU6050 0x68 = %s\r\n", (p68 == ESP_OK) ? "ACK" : "NO_ACK");
+    printf("I2C_DIAG: MPU6050 0x69 = %s\r\n", (p69 == ESP_OK) ? "ACK" : "NO_ACK");
+
+    ESP_LOGI("I2C_DIAG", "MAX30102 0x57 = %s", (p57 == ESP_OK) ? "ACK" : "NO_ACK");
+    ESP_LOGI("I2C_DIAG", "MPU6050 0x68 = %s", (p68 == ESP_OK) ? "ACK" : "NO_ACK");
+    ESP_LOGI("I2C_DIAG", "MPU6050 0x69 = %s", (p69 == ESP_OK) ? "ACK" : "NO_ACK");
+
+    /* =========================================================================
+     * STEP 6, 7 & 11: Sensor Initialization & Error Propagation
+     * ========================================================================= */
+    printf("POWER_DIAG: starting sensors\r\n");
+    ESP_LOGI("POWER_DIAG", "starting sensors");
+
+    /* MPU6050 initialization (test 0x68 or fallback to 0x69 if only 0x69 ACKed) */
+    uint8_t mpu_addr_to_use = (p68 == ESP_OK) ? 0x68 : ((p69 == ESP_OK) ? 0x69 : 0x68);
+    esp_err_t mpu_ret = mpu6050_init_with_addr(bus_handle, s_i2c_bus_mutex, mpu_addr_to_use);
     if (mpu_ret == ESP_OK) {
         s_mpu6050_available = true;
         ESP_LOGI("SENSOR_INIT", "MPU6050: initialization SUCCESS");
     } else {
         s_mpu6050_available = false;
-        ESP_LOGE("SENSOR_INIT", "MPU6050: initialization FAILED: %s", esp_err_to_name(mpu_ret));
+        printf("MPU6050_DIAG: polling disabled because initialization failed\r\n");
+        ESP_LOGW("MPU6050_DIAG", "polling disabled because initialization failed");
     }
 
+    /* MAX30102 initialization */
     esp_err_t max_ret = max30102_init(bus_handle, s_i2c_bus_mutex);
     if (max_ret == ESP_OK) {
         s_max30102_available = true;
         ESP_LOGI("SENSOR_INIT", "MAX30102: initialization SUCCESS");
     } else {
         s_max30102_available = false;
-        ESP_LOGE("SENSOR_INIT", "MAX30102: initialization FAILED: %s", esp_err_to_name(max_ret));
+        printf("MAX30102_DIAG: polling disabled because initialization failed\r\n");
+        ESP_LOGW("MAX30102_DIAG", "polling disabled because initialization failed");
     }
 
+    /* DHT11 initialization */
     dht11_init();
-    gps_init();
+    dht11_data_t dht_val = {0};
+    esp_err_t dht_err = dht11_read(&dht_val);
+    if (dht_err == ESP_OK && dht_val.is_valid) {
+        printf("DHT11_DIAG: INIT = PASS (T=%.1f C, H=%.1f %%)\r\n", dht_val.temperature_c, dht_val.humidity_percent);
+        ESP_LOGI("DHT11_DIAG", "INIT = PASS (T=%.1f C, H=%.1f %%)", dht_val.temperature_c, dht_val.humidity_percent);
+    } else {
+        printf("DHT11_DIAG: INIT = FAIL (%s)\r\n", esp_err_to_name(dht_err));
+        ESP_LOGW("DHT11_DIAG", "INIT = FAIL (%s)", esp_err_to_name(dht_err));
+    }
+
+    /* GPS initialization */
+    esp_err_t gps_err = gps_init();
+    printf("GPS_DIAG: INIT = %s (UART2 TX=%d, RX=%d at %d baud)\r\n",
+           (gps_err == ESP_OK) ? "PASS" : "FAIL",
+           PIN_GPS_TX, PIN_GPS_RX, GPS_BAUD_RATE);
+    ESP_LOGI("GPS_DIAG", "INIT = %s (UART2 TX=%d, RX=%d at %d baud)",
+             (gps_err == ESP_OK) ? "PASS" : "FAIL",
+             PIN_GPS_TX, PIN_GPS_RX, GPS_BAUD_RATE);
 
     /* =========================================================================
-     * 6. Defer Wi-Fi start by 5 seconds to isolate Brownout origin
+     * STEP 10: Delay Wi-Fi startup by 5000 ms to isolate Brownout origin
      * ========================================================================= */
-    ESP_LOGI("I2C_DIAG", "Hardware diagnostic delay active");
+    printf("POWER_DIAG: waiting 5s before Wi-Fi\r\n");
+    ESP_LOGI("POWER_DIAG", "waiting 5s before Wi-Fi");
     vTaskDelay(pdMS_TO_TICKS(5000));
-    ESP_LOGI("I2C_DIAG", "Starting Wi-Fi after diagnostic delay");
+    printf("POWER_DIAG: starting Wi-Fi\r\n");
+    ESP_LOGI("POWER_DIAG", "starting Wi-Fi");
 
     ESP_LOGI("WIFI_START", "=== STARTING WI-FI SUBSYSTEM ===");
     wifi_manager_init();
-    mqtt_app_start();
 
-    /* 7. Launch FreeRTOS Tasks */
+    /* =========================================================================
+     * STEP 8 & 12: Launch FreeRTOS Tasks with Protection against Polling Dead Sensors
+     * ========================================================================= */
     xTaskCreatePinnedToCore(gps_task, "gps_task", 4096, NULL, 3, NULL, 1);
-    xTaskCreatePinnedToCore(sensor_sampling_task, "sensor_task", 4096, NULL, 4, NULL, 1);
     xTaskCreatePinnedToCore(dht11_task, "dht11_task", 3072, NULL, 2, NULL, 1);
     xTaskCreatePinnedToCore(status_led_task, "status_led_task", 2048, NULL, 1, NULL, 0);
-    xTaskCreatePinnedToCore(telemetry_publisher_task, "telemetry_task", 6144, NULL, 5, NULL, 0);
 
-    ESP_LOGI(TAG, "All FreeRTOS tasks started successfully");
+    if (s_mpu6050_available || s_max30102_available) {
+        xTaskCreatePinnedToCore(sensor_sampling_task, "sensor_task", 4096, NULL, 4, NULL, 1);
+    } else {
+        ESP_LOGW(TAG, "sensor_task NOT started: neither MPU6050 nor MAX30102 is available");
+    }
+
+    ESP_LOGI(TAG, "Hardware diagnostic startup sequence complete");
 }

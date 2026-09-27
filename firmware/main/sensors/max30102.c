@@ -42,16 +42,36 @@ esp_err_t max30102_init(i2c_master_bus_handle_t bus_handle, SemaphoreHandle_t i2
     esp_err_t ret = i2c_master_bus_add_device(bus_handle, &dev_cfg, &s_max_dev_handle);
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Failed to register MAX30102 I2C device: %s", esp_err_to_name(ret));
+        printf("MAX30102_DIAG:\r\naddress = 0x%02X\r\nidentity = NO_RESPONSE\r\ninit = FAIL\r\n", MAX30102_I2C_ADDR);
         return ret;
     }
 
     if (xSemaphoreTake(s_i2c_mutex, pdMS_TO_TICKS(100)) == pdTRUE) {
+        /* Step 7: Probe Part ID (REG_PART_ID = 0xFF) */
+        uint8_t part_reg = REG_PART_ID;
+        uint8_t part_id = 0;
+        ret = i2c_master_transmit_receive(s_max_dev_handle, &part_reg, 1, &part_id, 1, 50);
+        if (ret != ESP_OK) {
+            xSemaphoreGive(s_i2c_mutex);
+            printf("MAX30102_DIAG:\r\naddress = 0x%02X\r\nidentity = NO_RESPONSE\r\ninit = FAIL\r\n", MAX30102_I2C_ADDR);
+            ESP_LOGE(TAG, "MAX30102_DIAG: NO_RESPONSE (%s)", esp_err_to_name(ret));
+            i2c_master_bus_rm_device(s_max_dev_handle);
+            s_max_dev_handle = NULL;
+            return ret;
+        }
+
+        printf("MAX30102_DIAG:\r\naddress = 0x%02X\r\nidentity = 0x%02X\r\n", MAX30102_I2C_ADDR, part_id);
+        ESP_LOGI(TAG, "MAX30102_DIAG: address = 0x%02X, identity = 0x%02X", MAX30102_I2C_ADDR, part_id);
+
         /* Soft Reset (REG_MODE_CONFIG = 0x40) */
         uint8_t reset_cmd[2] = {REG_MODE_CONFIG, 0x40};
         ret = i2c_master_transmit(s_max_dev_handle, reset_cmd, sizeof(reset_cmd), 50);
         if (ret != ESP_OK) {
             xSemaphoreGive(s_i2c_mutex);
+            printf("init = FAIL\r\n");
             ESP_LOGE(TAG, "initialization FAILED at reset: %s", esp_err_to_name(ret));
+            i2c_master_bus_rm_device(s_max_dev_handle);
+            s_max_dev_handle = NULL;
             return ret;
         }
         vTaskDelay(pdMS_TO_TICKS(10));
@@ -61,7 +81,10 @@ esp_err_t max30102_init(i2c_master_bus_handle_t bus_handle, SemaphoreHandle_t i2
         ret = i2c_master_transmit(s_max_dev_handle, fifo_cfg, sizeof(fifo_cfg), 50);
         if (ret != ESP_OK) {
             xSemaphoreGive(s_i2c_mutex);
+            printf("init = FAIL\r\n");
             ESP_LOGE(TAG, "initialization FAILED at fifo_cfg: %s", esp_err_to_name(ret));
+            i2c_master_bus_rm_device(s_max_dev_handle);
+            s_max_dev_handle = NULL;
             return ret;
         }
 
@@ -70,7 +93,10 @@ esp_err_t max30102_init(i2c_master_bus_handle_t bus_handle, SemaphoreHandle_t i2
         ret = i2c_master_transmit(s_max_dev_handle, mode_cfg, sizeof(mode_cfg), 50);
         if (ret != ESP_OK) {
             xSemaphoreGive(s_i2c_mutex);
+            printf("init = FAIL\r\n");
             ESP_LOGE(TAG, "initialization FAILED at mode_cfg: %s", esp_err_to_name(ret));
+            i2c_master_bus_rm_device(s_max_dev_handle);
+            s_max_dev_handle = NULL;
             return ret;
         }
 
@@ -79,7 +105,10 @@ esp_err_t max30102_init(i2c_master_bus_handle_t bus_handle, SemaphoreHandle_t i2
         ret = i2c_master_transmit(s_max_dev_handle, spo2_cfg, sizeof(spo2_cfg), 50);
         if (ret != ESP_OK) {
             xSemaphoreGive(s_i2c_mutex);
+            printf("init = FAIL\r\n");
             ESP_LOGE(TAG, "initialization FAILED at spo2_cfg: %s", esp_err_to_name(ret));
+            i2c_master_bus_rm_device(s_max_dev_handle);
+            s_max_dev_handle = NULL;
             return ret;
         }
 
@@ -89,22 +118,32 @@ esp_err_t max30102_init(i2c_master_bus_handle_t bus_handle, SemaphoreHandle_t i2
         ret = i2c_master_transmit(s_max_dev_handle, led1_cmd, sizeof(led1_cmd), 50);
         if (ret != ESP_OK) {
             xSemaphoreGive(s_i2c_mutex);
+            printf("init = FAIL\r\n");
             ESP_LOGE(TAG, "initialization FAILED at led1: %s", esp_err_to_name(ret));
+            i2c_master_bus_rm_device(s_max_dev_handle);
+            s_max_dev_handle = NULL;
             return ret;
         }
         ret = i2c_master_transmit(s_max_dev_handle, led2_cmd, sizeof(led2_cmd), 50);
         if (ret != ESP_OK) {
             xSemaphoreGive(s_i2c_mutex);
+            printf("init = FAIL\r\n");
             ESP_LOGE(TAG, "initialization FAILED at led2: %s", esp_err_to_name(ret));
+            i2c_master_bus_rm_device(s_max_dev_handle);
+            s_max_dev_handle = NULL;
             return ret;
         }
 
         xSemaphoreGive(s_i2c_mutex);
-        ESP_LOGI(TAG, "initialization SUCCESS in SpO2 mode");
+        printf("init = PASS\r\n");
+        ESP_LOGI(TAG, "MAX30102_DIAG: init = PASS (SpO2 mode)");
         return ESP_OK;
     }
 
+    printf("MAX30102_DIAG:\r\naddress = 0x%02X\r\nidentity = TIMEOUT\r\ninit = FAIL\r\n", MAX30102_I2C_ADDR);
     ESP_LOGE(TAG, "initialization FAILED: mutex acquisition timeout");
+    i2c_master_bus_rm_device(s_max_dev_handle);
+    s_max_dev_handle = NULL;
     return ESP_ERR_TIMEOUT;
 }
 

@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
 from app.db.session import AsyncSessionLocal
+from app.integrations.groq_client import GroqClient
 from app.integrations.nvidia_client import (
     AIClientError,
     AIClientParseError,
@@ -53,7 +54,9 @@ class AIAnalysisService:
         self.ai_client: BaseAIClient | None
         if ai_client is not None:
             self.ai_client = ai_client
-        elif settings.NVIDIA_ENABLED:
+        elif settings.GROQ_ENABLED and settings.GROQ_API_KEY:
+            self.ai_client = GroqClient()
+        elif settings.NVIDIA_ENABLED and settings.NVIDIA_API_KEY:
             self.ai_client = NVIDIAClient()
         else:
             self.ai_client = None
@@ -82,10 +85,15 @@ class AIAnalysisService:
                 )
                 return existing
 
-        initial_provider = (
-            AIProvider.NVIDIA if settings.NVIDIA_ENABLED else AIProvider.FALLBACK_RULES
-        )
-        model_name = settings.NVIDIA_MODEL if settings.NVIDIA_ENABLED else "deterministic_fallback"
+        if settings.GROQ_ENABLED:
+            initial_provider = AIProvider.GROQ
+            model_name = settings.GROQ_MODEL
+        elif settings.NVIDIA_ENABLED:
+            initial_provider = AIProvider.NVIDIA
+            model_name = settings.NVIDIA_MODEL
+        else:
+            initial_provider = AIProvider.FALLBACK_RULES
+            model_name = "deterministic_fallback"
 
         analysis = AIAnalysis(
             alert_id=alert_id,
@@ -147,15 +155,20 @@ class AIAnalysisService:
             recent_measurements=recent_measurements,
         )
 
-        # Check if NVIDIA is enabled and client available
-        if not settings.NVIDIA_ENABLED or self.ai_client is None:
+        # Check if AI enrichment is enabled and client available
+        ai_enabled = (
+            (settings.GROQ_ENABLED and bool(settings.GROQ_API_KEY))
+            or (settings.NVIDIA_ENABLED and bool(settings.NVIDIA_API_KEY))
+        ) and self.ai_client is not None
+
+        if not ai_enabled or self.ai_client is None:
             logger.info(
-                "NVIDIA AI is disabled; generating deterministic fallback for alert %s", alert.id
+                "AI enrichment disabled; generating deterministic fallback for alert %s", alert.id
             )
             fallback = self.context_builder.create_fallback_enrichment(
                 alert_type=context_dto.alert_type,
                 severity=context_dto.severity,
-                reason="NVIDIA AI disabled by configuration",
+                reason="AI enrichment disabled by configuration",
             )
             analysis.provider = AIProvider.FALLBACK_RULES
             analysis.status = AIAnalysisStatus.FALLBACK
@@ -180,7 +193,7 @@ class AIAnalysisService:
             system_prompt, user_prompt = self.context_builder.build_prompts(context_dto)
             response = await self.ai_client.analyze(system_prompt, user_prompt)
 
-            analysis.provider = AIProvider.NVIDIA
+            analysis.provider = AIProvider.GROQ if settings.GROQ_ENABLED else AIProvider.NVIDIA
             analysis.status = AIAnalysisStatus.COMPLETED
             analysis.risk_level = (
                 alert.severity.value if hasattr(alert.severity, "value") else str(alert.severity)

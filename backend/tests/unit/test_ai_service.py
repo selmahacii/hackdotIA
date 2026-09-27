@@ -1,7 +1,7 @@
 """Unit tests for AIAnalysisService, idempotency, and fallback behavior."""
 
-from datetime import UTC, datetime
 import uuid
+from datetime import UTC, datetime
 
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -102,7 +102,7 @@ async def test_ai_analysis_service_successful_enrichment(
     assert analysis.id is not None
     assert analysis.alert_id == alert.id
     assert analysis.status == AIAnalysisStatus.COMPLETED
-    assert analysis.provider == AIProvider.NVIDIA
+    assert analysis.provider in (AIProvider.GROQ, AIProvider.NVIDIA)
     assert analysis.confidence == 0.88
     assert analysis.model_name == "meta/llama-3.1-8b-instruct"
     assert analysis.latency_ms == 42
@@ -165,6 +165,7 @@ async def test_ai_analysis_service_nvidia_disabled(
     sample_alert: tuple[ElderlyPerson, Device, Alert],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    monkeypatch.setattr(settings, "GROQ_ENABLED", False)
     monkeypatch.setattr(settings, "NVIDIA_ENABLED", False)
     _, _, alert = sample_alert
     service = AIAnalysisService(db_session, ai_client=None)

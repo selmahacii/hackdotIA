@@ -1,7 +1,7 @@
 """Integration tests for AI Enrichment persistence and background pipeline."""
 
-from datetime import UTC, datetime
 import uuid
+from datetime import UTC, datetime
 
 import pytest
 from sqlalchemy import select

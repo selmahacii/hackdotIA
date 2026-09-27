@@ -1,7 +1,7 @@
 """Unit tests for AI Context Builder and prompt generation."""
 
-from datetime import UTC, datetime
 import uuid
+from datetime import UTC, datetime
 
 from app.models.alert import Alert
 from app.models.enums import AlertSeverity, AlertSource, AlertStatus, AlertType, SensorHealthStatus

@@ -22,7 +22,9 @@
 #define PIN_LED_GREEN           26      /* System & Network status */
 #define PIN_LED_RED             27      /* Hardware Warning indicator */
 
-/* Temporary diagnostic flag: disable boot buzzer beep */
+/* Temporary diagnostic flags */
+#define HARDWARE_DIAGNOSTIC_MODE      1
+#define BUZZER_BOOT_BEEP              0
 #define CONFIG_DIAGNOSTIC_BOOT_SILENT 1
 
 /* =========================================================================

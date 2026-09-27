@@ -1,10 +1,10 @@
 """Integration tests for AI Analysis API endpoints, authentication, and RBAC."""
 
-from datetime import UTC, datetime
 import uuid
+from datetime import UTC, datetime
 
-from httpx import AsyncClient
 import pytest
+from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.security import create_access_token
@@ -13,7 +13,6 @@ from app.models.device import Device
 from app.models.elderly import ElderlyPerson
 from app.models.enums import AlertSeverity, AlertSource, AlertStatus, AlertType, DeviceStatus
 from app.models.measurement import Measurement
-from app.services.ai_analysis import AIAnalysisService
 
 
 @pytest.fixture

@@ -11,9 +11,11 @@ from app.models.enums import (
     AlertType,
     DeviceStatus,
     SensorHealthStatus,
+    UserRole,
 )
 from app.models.measurement import Measurement
 from app.models.sensor_health import SensorHealth
+from app.models.user import User
 
 __all__ = [
     "AIAnalysis",
@@ -30,4 +32,6 @@ __all__ = [
     "Measurement",
     "SensorHealth",
     "SensorHealthStatus",
+    "User",
+    "UserRole",
 ]

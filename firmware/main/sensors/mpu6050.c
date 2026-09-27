@@ -10,11 +10,17 @@ static const char *TAG = "MPU6050";
 #define REG_ACCEL_CONFIG    0x1C
 #define REG_ACCEL_XOUT_H    0x3B
 #define REG_PWR_MGMT_1      0x6B
+#define REG_WHO_AM_I        0x75
 
 static i2c_master_dev_handle_t s_mpu_dev_handle = NULL;
 static SemaphoreHandle_t s_i2c_mutex = NULL;
 
 esp_err_t mpu6050_init(i2c_master_bus_handle_t bus_handle, SemaphoreHandle_t i2c_mutex)
+{
+    return mpu6050_init_with_addr(bus_handle, i2c_mutex, MPU6050_I2C_ADDR);
+}
+
+esp_err_t mpu6050_init_with_addr(i2c_master_bus_handle_t bus_handle, SemaphoreHandle_t i2c_mutex, uint8_t dev_addr)
 {
     if (!bus_handle || !i2c_mutex) {
         ESP_LOGE(TAG, "Invalid bus_handle or mutex pointer");
@@ -25,23 +31,45 @@ esp_err_t mpu6050_init(i2c_master_bus_handle_t bus_handle, SemaphoreHandle_t i2c
 
     i2c_device_config_t dev_cfg = {
         .dev_addr_length = I2C_ADDR_BIT_LEN_7,
-        .device_address = MPU6050_I2C_ADDR,
+        .device_address = dev_addr,
         .scl_speed_hz = I2C_MASTER_FREQ_HZ,
     };
 
     esp_err_t ret = i2c_master_bus_add_device(bus_handle, &dev_cfg, &s_mpu_dev_handle);
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Failed to add MPU6050 device to I2C bus: %s", esp_err_to_name(ret));
+        printf("MPU6050_DIAG:\r\naddress = 0x%02X\r\nWHO_AM_I = ERROR (%s)\r\ninit = FAIL\r\n",
+               dev_addr, esp_err_to_name(ret));
         return ret;
     }
 
     if (xSemaphoreTake(s_i2c_mutex, pdMS_TO_TICKS(100)) == pdTRUE) {
+        /* Step 6: Read WHO_AM_I register */
+        uint8_t reg_who = REG_WHO_AM_I;
+        uint8_t who_val = 0;
+        ret = i2c_master_transmit_receive(s_mpu_dev_handle, &reg_who, 1, &who_val, 1, 100);
+        if (ret != ESP_OK) {
+            printf("MPU6050_DIAG:\r\naddress = 0x%02X\r\nWHO_AM_I = NO_RESPONSE (%s)\r\ninit = FAIL\r\n",
+                   dev_addr, esp_err_to_name(ret));
+            ESP_LOGE(TAG, "MPU6050_DIAG: address = 0x%02X, WHO_AM_I read failed: %s", dev_addr, esp_err_to_name(ret));
+            xSemaphoreGive(s_i2c_mutex);
+            i2c_master_bus_rm_device(s_mpu_dev_handle);
+            s_mpu_dev_handle = NULL;
+            return ret;
+        }
+
+        printf("MPU6050_DIAG:\r\naddress = 0x%02X\r\nWHO_AM_I = 0x%02X\r\n", dev_addr, who_val);
+        ESP_LOGI(TAG, "MPU6050_DIAG: address = 0x%02X, WHO_AM_I = 0x%02X", dev_addr, who_val);
+
         /* 1. Wake up device from default sleep mode (PWR_MGMT_1 = 0x00) */
         uint8_t pwr_cmd[2] = {REG_PWR_MGMT_1, 0x00};
         ret = i2c_master_transmit(s_mpu_dev_handle, pwr_cmd, sizeof(pwr_cmd), 100);
         if (ret != ESP_OK) {
+            printf("init = FAIL\r\n");
             ESP_LOGE(TAG, "initialization FAILED at wake: %s", esp_err_to_name(ret));
             xSemaphoreGive(s_i2c_mutex);
+            i2c_master_bus_rm_device(s_mpu_dev_handle);
+            s_mpu_dev_handle = NULL;
             return ret;
         }
 
@@ -51,15 +79,22 @@ esp_err_t mpu6050_init(i2c_master_bus_handle_t bus_handle, SemaphoreHandle_t i2c
         xSemaphoreGive(s_i2c_mutex);
 
         if (ret != ESP_OK) {
+            printf("init = FAIL\r\n");
             ESP_LOGE(TAG, "initialization FAILED at scale: %s", esp_err_to_name(ret));
+            i2c_master_bus_rm_device(s_mpu_dev_handle);
+            s_mpu_dev_handle = NULL;
             return ret;
         }
 
+        printf("init = PASS\r\n");
         ESP_LOGI(TAG, "initialization SUCCESS (+-8g mode, 4096 LSB/g)");
         return ESP_OK;
     }
 
+    printf("MPU6050_DIAG:\r\naddress = 0x%02X\r\nWHO_AM_I = TIMEOUT\r\ninit = FAIL\r\n", dev_addr);
     ESP_LOGE(TAG, "initialization FAILED: mutex acquisition timeout");
+    i2c_master_bus_rm_device(s_mpu_dev_handle);
+    s_mpu_dev_handle = NULL;
     return ESP_ERR_TIMEOUT;
 }
 

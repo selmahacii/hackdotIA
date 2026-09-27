@@ -5,6 +5,7 @@ from app.repositories.device import DeviceRepository
 from app.repositories.elderly import ElderlyRepository
 from app.repositories.measurement import MeasurementRepository
 from app.repositories.sensor_health import SensorHealthRepository
+from app.repositories.user import UserRepository
 
 __all__ = [
     "AIAnalysisRepository",
@@ -14,4 +15,5 @@ __all__ = [
     "ElderlyRepository",
     "MeasurementRepository",
     "SensorHealthRepository",
+    "UserRepository",
 ]

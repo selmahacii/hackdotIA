@@ -93,7 +93,10 @@ async def trigger_alert_ai_analysis(
 
 
 @router.websocket("/alerts/ws")
-async def alerts_websocket_endpoint(websocket: WebSocket) -> None:
+async def alerts_websocket_endpoint(
+    websocket: WebSocket,
+    token: str | None = Query(default=None),
+) -> None:
     """Real-time WebSocket endpoint for receiving live alerts and AI enrichment notifications."""
     await ws_manager.connect(websocket)
     try:

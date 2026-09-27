@@ -1,6 +1,14 @@
 from enum import Enum
 
 
+class UserRole(str, Enum):
+    SUPERADMIN = "SUPERADMIN"
+    ADMIN = "ADMIN"
+    CAREGIVER = "CAREGIVER"
+    OPERATOR = "OPERATOR"
+    READ_ONLY = "READ_ONLY"
+
+
 class DeviceStatus(str, Enum):
     ONLINE = "ONLINE"
     OFFLINE = "OFFLINE"
