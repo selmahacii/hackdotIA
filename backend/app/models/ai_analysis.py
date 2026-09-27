@@ -48,6 +48,7 @@ class AIAnalysis(Base):
     confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
     model_name: Mapped[str | None] = mapped_column(String(100), nullable=True)
     latency_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    error: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),

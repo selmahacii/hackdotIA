@@ -1,0 +1,31 @@
+idf_component_register(
+    SRCS
+        "main.c"
+        "sensors/mpu6050.c"
+        "sensors/max30102.c"
+        "sensors/dht11.c"
+        "sensors/gps.c"
+        "telemetry/telemetry.c"
+        "wifi/wifi_manager.c"
+        "mqtt/app_mqtt.c"
+        "system/time_sync.c"
+    INCLUDE_DIRS
+        "."
+        "sensors"
+        "telemetry"
+        "wifi"
+        "mqtt"
+        "system"
+    REQUIRES
+        esp_driver_gpio
+        esp_driver_i2c
+        esp_driver_uart
+        esp_wifi
+        esp_event
+        esp_netif
+        nvs_flash
+        esp_timer
+        lwip
+        espressif__mqtt
+        espressif__cjson
+)

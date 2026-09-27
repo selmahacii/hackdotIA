@@ -37,9 +37,17 @@ class Settings(BaseSettings):
     # AI (NVIDIA API / OpenAI compatible)
     AI_PROVIDER: str = "nvidia"
     AI_BASE_URL: str = "https://integrate.api.nvidia.com/v1"
-    AI_MODEL: str = ""
+    AI_MODEL: str = "meta/llama-3.1-8b-instruct"
     NVIDIA_API_KEY: str = ""
-    AI_TIMEOUT_S: float = 6.0
+    AI_TIMEOUT_S: float = 10.0
+
+    # NVIDIA Official Configuration
+    NVIDIA_ENABLED: bool = True
+    NVIDIA_BASE_URL: str = "https://integrate.api.nvidia.com/v1"
+    NVIDIA_MODEL: str = "meta/llama-3.1-8b-instruct"
+    NVIDIA_TIMEOUT_SECONDS: float = 10.0
+    NVIDIA_MAX_TOKENS: int = 500
+    NVIDIA_TEMPERATURE: float = 0.1
 
     # Sensor Health & Processing Thresholds
     SENSOR_MAX30102_ABSENCE_THRESHOLD_S: float = 60.0

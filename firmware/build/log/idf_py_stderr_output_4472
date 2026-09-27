@@ -1,0 +1,11 @@
+Command: ninja flash
+ERROR: A fatal error occurred: Could not open COM3, the port is busy or doesn't exist.
+(could not open port 'COM3': PermissionError(13, 'Acc├¿s refus├®.', None, 5))
+
+CMake Error at C:/esp/v6.1/esp-idf/components/esptool_py/run_serial_tool.cmake:142 (message):
+  
+  C:/Users/ZBOOK/.espressif/python_env/idf6.1_py3.12_env/Scripts/python.exe;-m;esptool;--chip;esp32
+  failed.
+
+
+

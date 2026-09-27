@@ -46,6 +46,7 @@ class AIProvider(str, Enum):
 
 class AIAnalysisStatus(str, Enum):
     PENDING = "PENDING"
+    RUNNING = "RUNNING"
     COMPLETED = "COMPLETED"
     FAILED = "FAILED"
     FALLBACK = "FALLBACK"
