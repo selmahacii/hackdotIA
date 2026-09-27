@@ -11,7 +11,7 @@ class Settings(BaseSettings):
         case_sensitive=True,
     )
 
-    PROJECT_NAME: str = "Smart Elderly Monitoring System"
+    PROJECT_NAME: str = "Guardia Monitoring Platform"
     API_V1_STR: str = "/api/v1"
 
     # Database
