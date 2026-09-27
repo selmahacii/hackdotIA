@@ -1,0 +1,40 @@
+name: smart_elderly
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: smart_elderly_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: elderly
+      POSTGRES_USER: elderly
+      POSTGRES_PASSWORD: elderly
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U elderly -d elderly"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+
+  mosquitto:
+    image: eclipse-mosquitto:2
+    container_name: smart_elderly_mosquitto
+    restart: unless-stopped
+    ports:
+      - "1883:1883"
+    volumes:
+      - ./mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+    healthcheck:
+      test: ["CMD-SHELL", "mosquitto_sub -t '$$SYS/#' -C 1 -i healthcheck -W 3 || exit 0"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+
+volumes:
+  postgres_data:
+    name: smart_elderly_postgres_data
