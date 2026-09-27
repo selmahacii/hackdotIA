@@ -16,11 +16,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Python requirements
-COPY requirements.txt /app/requirements.txt
+COPY backend/requirements.txt /app/requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy backend source
-COPY . /app
+COPY backend /app
 
 # Ensure entrypoint execution rights
 RUN chmod +x /app/scripts/start_hf.sh
