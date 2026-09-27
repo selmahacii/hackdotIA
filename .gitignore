@@ -33,3 +33,12 @@ Thumbs.db
 # Database files
 *.sqlite3
 *.db
+
+# Frontend
+node_modules/
+dist/
+dist-ssr/
+
+# Firmware build artifacts
+firmware/build/
+firmware/managed_components/

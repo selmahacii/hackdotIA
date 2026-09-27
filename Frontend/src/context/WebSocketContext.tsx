@@ -33,9 +33,16 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
     setIsConnecting(true);
 
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    // Use host and port matching current environment or backend proxy
-    const wsUrl = `${protocol}//${window.location.host}/api/v1/alerts/ws?token=${token}`;
+    let wsUrl: string;
+    const apiUrl = import.meta.env.VITE_API_URL;
+    if (apiUrl) {
+      const wsProto = apiUrl.startsWith('https:') ? 'wss:' : 'ws:';
+      const cleanHost = apiUrl.replace(/^https?:\/\//, '').replace(/\/$/, '');
+      wsUrl = `${wsProto}//${cleanHost}/api/v1/alerts/ws?token=${token}`;
+    } else {
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      wsUrl = `${protocol}//${window.location.host}/api/v1/alerts/ws?token=${token}`;
+    }
 
     try {
       const ws = new WebSocket(wsUrl);

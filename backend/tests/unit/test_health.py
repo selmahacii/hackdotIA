@@ -19,10 +19,12 @@ async def test_health_endpoint(async_client: AsyncClient) -> None:
 
 @pytest.mark.asyncio
 async def test_root_endpoint(async_client: AsyncClient) -> None:
+    from app.config import settings
+
     response = await async_client.get("/")
     assert response.status_code == 200
     data = response.json()
-    assert data["name"] == "Smart Elderly Monitoring System"
+    assert data["name"] == settings.PROJECT_NAME
     assert data["health"] == "/api/v1/health"
     assert data["ready"] == "/api/v1/ready"
 
