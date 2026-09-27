@@ -39,6 +39,7 @@ class AlertSource(str, Enum):
 
 
 class AIProvider(str, Enum):
+    GROQ = "GROQ"
     NVIDIA = "NVIDIA"
     FALLBACK_RULES = "FALLBACK_RULES"
     NONE = "NONE"

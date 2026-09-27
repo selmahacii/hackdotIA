@@ -41,8 +41,17 @@ class Settings(BaseSettings):
     NVIDIA_API_KEY: str = ""
     AI_TIMEOUT_S: float = 10.0
 
-    # NVIDIA Official Configuration
-    NVIDIA_ENABLED: bool = True
+    # Groq Official Configuration
+    GROQ_ENABLED: bool = True
+    GROQ_API_KEY: str | None = None
+    GROQ_BASE_URL: str = "https://api.groq.com/openai/v1"
+    GROQ_MODEL: str = "openai/gpt-oss-20b"
+    GROQ_TIMEOUT_SECONDS: float = 15.0
+    GROQ_MAX_TOKENS: int = 500
+    GROQ_TEMPERATURE: float = 0.1
+
+    # NVIDIA Configuration (maintained for backwards compatibility)
+    NVIDIA_ENABLED: bool = False
     NVIDIA_BASE_URL: str = "https://integrate.api.nvidia.com/v1"
     NVIDIA_MODEL: str = "meta/llama-3.1-8b-instruct"
     NVIDIA_TIMEOUT_SECONDS: float = 10.0
